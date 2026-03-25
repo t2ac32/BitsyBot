@@ -62,6 +62,14 @@ All config lives in `config.py` with env var overrides from `.env`. Key variable
 
 SQLite with tables: `grids`, `grid_levels`, `trades`, `balance_history`, `candles`. All engines persist trades and balances for dashboard visualization. Schema is auto-created in `data/db.py:init_db()`.
 
+## Git Workflow
+
+- **`main`** is production. Never commit directly to main.
+- **`develop`** is the integration branch. All new work merges here first.
+- For new features or fixes, create a feature branch off `develop`, do the work, then open a PR into `develop`.
+- Only merge `develop` into `main` when the user explicitly approves a production release.
+- When spawning new agents (Task tool), always ensure they work on the `develop` branch or a feature branch off `develop` — never on `main`.
+
 ## Key Design Decisions
 
 - All three engines simulate/apply a **0.1% taker fee** for realistic P&L
