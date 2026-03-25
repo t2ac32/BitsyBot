@@ -4,6 +4,7 @@ BitsyBot Streamlit Dashboard.
 Run with:
     streamlit run dashboard/app.py
 """
+import subprocess
 import sys
 from pathlib import Path
 
@@ -78,6 +79,45 @@ with st.sidebar:
     st.divider()
 
     selected_mode = st.selectbox("Mode", ["paper", "live", "backtest"], index=0)
+
+    if selected_mode == "backtest":
+        project_root = str(Path(__file__).parent.parent)
+        if "backtest_running" not in st.session_state:
+            st.session_state.backtest_running = False
+        if "backtest_output" not in st.session_state:
+            st.session_state.backtest_output = None
+
+        if st.button("Run Backtest", disabled=st.session_state.backtest_running):
+            st.session_state.backtest_running = True
+            with st.status("Running backtest...", expanded=True) as status:
+                try:
+                    result = subprocess.run(
+                        [sys.executable, "main.py", "--mode", "backtest"],
+                        cwd=project_root,
+                        capture_output=True,
+                        text=True,
+                        timeout=300,
+                    )
+                    if result.returncode == 0:
+                        st.session_state.backtest_output = result.stdout
+                        status.update(label="Backtest complete!", state="complete")
+                        st.write(result.stdout)
+                    else:
+                        st.session_state.backtest_output = result.stderr or result.stdout
+                        status.update(label="Backtest failed", state="error")
+                        st.error(result.stderr or result.stdout)
+                except subprocess.TimeoutExpired:
+                    st.session_state.backtest_output = "Backtest timed out after 5 minutes."
+                    status.update(label="Backtest timed out", state="error")
+                    st.error("Backtest timed out after 5 minutes.")
+                finally:
+                    st.session_state.backtest_running = False
+                    st.cache_data.clear()
+
+        if st.session_state.backtest_output:
+            with st.expander("Last backtest output"):
+                st.code(st.session_state.backtest_output)
+
     st.divider()
 
     st.subheader("Grid Configuration")
