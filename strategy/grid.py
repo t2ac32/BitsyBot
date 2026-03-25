@@ -146,7 +146,10 @@ class GridStrategy:
         fills = []
         updated_levels = list(levels)  # shallow copy
 
-        for level in updated_levels:
+        # Iterate over a snapshot so counter-orders added during this candle
+        # aren't evaluated until the next candle (prevents infinite loops when
+        # a candle's range spans both buy and sell levels).
+        for level in list(updated_levels):
             if level.status != LevelStatus.OPEN:
                 continue
 
