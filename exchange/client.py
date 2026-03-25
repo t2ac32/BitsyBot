@@ -17,6 +17,7 @@ from exchange.models import Balance, Candle, Order, Ticker, Trade
 
 class BitsoClient:
     BASE_URL = "https://api.bitso.com"
+    OHLC_URL = "https://bitso.com/api/v3/ohlc"
 
     def __init__(self, api_key: str = "", api_secret: str = ""):
         self.api_key = api_key
@@ -90,6 +91,12 @@ class BitsoClient:
             else datetime.utcnow(),
         )
 
+    # Bitso OHLC expects time_bucket in seconds, not friendly strings
+    BUCKET_MAP = {
+        "1m": "60", "5m": "300", "15m": "900", "30m": "1800",
+        "1h": "3600", "4h": "14400", "12h": "43200", "1d": "86400", "1w": "604800",
+    }
+
     def get_candles(
         self,
         book: str = "btc_mxn",
@@ -99,24 +106,30 @@ class BitsoClient:
     ) -> list[Candle]:
         """
         Fetch OHLCV candles.
-        time_bucket: 1m, 5m, 15m, 30m, 1h, 4h, 1d, 1w
-        start/end: Unix timestamps in seconds
+        time_bucket: 1m, 5m, 15m, 30m, 1h, 4h, 1d, 1w (converted to seconds for API)
+        start/end: Unix timestamps in seconds (converted to milliseconds for API)
         """
-        params: dict = {"book": book, "time_bucket": time_bucket}
+        bucket = self.BUCKET_MAP.get(time_bucket, time_bucket)
+        params: dict = {"book": book, "time_bucket": bucket}
         if start:
-            params["start"] = start
+            params["start"] = start * 1000
         if end:
-            params["end"] = end
-        payload = self._get("/v3/ohlc/", params=params)
+            params["end"] = end * 1000
+        resp = self.session.get(self.OHLC_URL, params=params, timeout=15)
+        resp.raise_for_status()
+        data = resp.json()
+        if not data.get("success"):
+            raise RuntimeError(f"Bitso OHLC API error: {data}")
+        payload = data["payload"]
         candles = []
         for c in payload:
             candles.append(
                 Candle(
                     timestamp=datetime.utcfromtimestamp(int(c["bucket_start_time"]) / 1000),
-                    open=float(c["open"]),
-                    high=float(c["high"]),
-                    low=float(c["low"]),
-                    close=float(c["close"]),
+                    open=float(c.get("first_rate") or c["open"]),
+                    high=float(c.get("max_rate") or c["high"]),
+                    low=float(c.get("min_rate") or c["low"]),
+                    close=float(c.get("last_rate") or c["close"]),
                     volume=float(c["volume"]),
                 )
             )

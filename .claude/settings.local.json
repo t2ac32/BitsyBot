@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sqlite3:*)",
+      "WebFetch(domain:docs.bitso.com)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:api.bitso.com)",
+      "WebFetch(domain:bitso.com)",
+      "Bash(git add:*)"
+    ]
+  }
+}

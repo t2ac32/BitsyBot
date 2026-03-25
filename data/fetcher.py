@@ -38,7 +38,7 @@ def fetch_and_store(
             inserted = upsert_candles(book, time_bucket, candles)
             total_inserted += inserted
             print(f"  Fetched {len(candles)} candles ({inserted} new) "
-                  f"[{datetime.utcfromtimestamp(cursor_start).date()} → "
+                  f"[{datetime.utcfromtimestamp(cursor_start).date()} -> "
                   f"{datetime.utcfromtimestamp(cursor_end).date()}]")
         cursor_start = cursor_end
         time.sleep(0.2)  # stay within rate limits
