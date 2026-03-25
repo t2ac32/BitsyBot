@@ -124,8 +124,8 @@ class RegimeEngine:
             if not candles:
                 continue
 
-            new_regime = self.detector.detect(candles)
             old_regime = self.regimes[book]
+            new_regime = self.detector.detect(candles, old_regime)
 
             if new_regime and new_regime != old_regime:
                 self.regimes[book] = new_regime

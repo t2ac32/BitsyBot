@@ -35,7 +35,7 @@ class RegimeDetector:
     ----------
     atr_threshold_pct : float
         ATR as a percentage of price above which the market is considered
-        high-volatility (accumulation zone). Default 3.5 means 3.5%.
+        high-volatility (accumulation zone). Default 5.0 means 5.0%.
     sma_convergence_pct : float
         When SMA-20 and SMA-50 are within this % of each other,
         they're considered "flat" (accumulation). Default 1.0%.
@@ -51,12 +51,12 @@ class RegimeDetector:
 
     def __init__(
         self,
-        atr_threshold_pct: float = 3.5,
+        atr_threshold_pct: float = 5.0,
         sma_convergence_pct: float = 1.0,
         sma_short: int = 20,
         sma_long: int = 50,
-        rsi_bull_threshold: float = 55.0,
-        rsi_bear_threshold: float = 45.0,
+        rsi_bull_threshold: float = 60.0,
+        rsi_bear_threshold: float = 40.0,
     ):
         self.atr_threshold_pct = atr_threshold_pct
         self.sma_convergence_pct = sma_convergence_pct
@@ -65,15 +65,17 @@ class RegimeDetector:
         self.rsi_bull_threshold = rsi_bull_threshold
         self.rsi_bear_threshold = rsi_bear_threshold
 
-    def detect(self, candles: list) -> Optional[MarketRegime]:
+    def detect(self, candles: list, last_regime: Optional[MarketRegime] = None) -> Optional[MarketRegime]:
         """
         Analyze candles and return the current regime using multiple indicators.
 
         candles: list of objects/rows with .close, .high, .low attributes (or dict-like).
+        last_regime: previous regime to apply hysteresis (prevents flip-flopping).
         Needs at least sma_long candles (default 50).
         Returns None if insufficient data.
 
         Priority: BULL > BEAR > ACCUMULATION (relaxed detection)
+        Hysteresis: Requires 4+ opposing signals to exit current regime (vs 3 to enter).
         """
         closes = [self._get(c, "close") for c in candles]
         highs = [self._get(c, "high") for c in candles]
@@ -111,7 +113,7 @@ class RegimeDetector:
         # ATR as percentage of current price
         atr_pct = (current_atr / current_price) * 100 if current_price > 0 else 0
 
-        # ── BULL Detection (relaxed criteria) ──
+        # ── BULL Detection ──
         bull_signals = 0
 
         if current_price > current_sma_short:
@@ -124,10 +126,6 @@ class RegimeDetector:
             bull_signals += 1
         if macd_bullish:
             bull_signals += 1
-
-        # BULL if 2+ signals (was 5/5 before, now 2/5)
-        if bull_signals >= 2:
-            return MarketRegime.BULL
 
         # ── BEAR Detection ──
         bear_signals = 0
@@ -143,9 +141,29 @@ class RegimeDetector:
         if macd_bearish:
             bear_signals += 1
 
-        # BEAR if 3+ signals (stricter than bull)
-        if bear_signals >= 3:
-            return MarketRegime.BEAR
+        # ── HYSTERESIS: Apply stickiness to prevent flip-flopping ──
+        # If already in BULL, require 4+ BEAR signals to switch to BEAR (not just 3)
+        # If already in BEAR, require 4+ BULL signals to switch to BULL (not just 3)
+        if last_regime == MarketRegime.BULL:
+            # Stay in BULL unless we have strong bearish signals
+            if bear_signals >= 4:
+                return MarketRegime.BEAR
+            elif bull_signals >= 3:
+                return MarketRegime.BULL
+            # Weak signals - fall through to accumulation
+        elif last_regime == MarketRegime.BEAR:
+            # Stay in BEAR unless we have strong bullish signals
+            if bull_signals >= 4:
+                return MarketRegime.BULL
+            elif bear_signals >= 3:
+                return MarketRegime.BEAR
+            # Weak signals - fall through to accumulation
+        else:
+            # No previous regime or in ACCUMULATION - use normal thresholds
+            if bull_signals >= 3:
+                return MarketRegime.BULL
+            if bear_signals >= 3:
+                return MarketRegime.BEAR
 
         # ── ACCUMULATION (fallback) ──
         # High volatility OR no clear trend
@@ -191,7 +209,7 @@ class RegimeStrategy:
         books: list[str],
         total_investment_mxn: float,
         dca_interval_days: int = 90,
-        sell_pct: float = 0.20,        # More aggressive profit-taking
+        sell_pct: float = 0.10,        # Gradual profit-taking
         buy_pct_bear: float = 0.05,    # Conservative buys in bear
         buy_pct_accum: float = 0.05,   # Conservative buys in accumulation
         downtrend_protection_pct: float = 20.0,
@@ -241,10 +259,10 @@ class RegimeStrategy:
 
         signals: list[Signal] = []
 
-        # ── STOP-LOSS: Sell if down >30% from cost basis (regardless of regime) ──
+        # ── STOP-LOSS: Sell if down >50% from cost basis (regardless of regime) ──
         if average_cost and average_cost > 0 and holdings_base > 0:
             drawdown_pct = ((average_cost - current_price) / average_cost) * 100
-            if drawdown_pct > 30.0:  # Down more than 30%
+            if drawdown_pct > 50.0:  # Down more than 50%
                 # Emergency sell ALL holdings
                 signals.append(Signal(
                     book=book,
@@ -255,16 +273,22 @@ class RegimeStrategy:
                 return signals  # Don't evaluate other signals
 
         if regime == MarketRegime.BULL:
-            # Take profits — sell a fraction of holdings
+            # Take profits — sell a fraction of holdings (only if 7+ days since last buy)
             if holdings_base > 0:
-                sell_amount_base = holdings_base * self.sell_pct
-                if sell_amount_base * current_price > 1.0:  # minimum ~1 MXN
-                    signals.append(Signal(
-                        book=book,
-                        side="sell",
-                        amount=sell_amount_base,
-                        reason=f"BULL regime — taking {self.sell_pct*100:.0f}% profits",
-                    ))
+                # Minimum holding period: only sell if no recent buy (7 days)
+                days_since_buy = float("inf")
+                if last_buy_time is not None:
+                    days_since_buy = (now - last_buy_time).total_seconds() / 86400
+
+                if days_since_buy >= 7.0:
+                    sell_amount_base = holdings_base * self.sell_pct
+                    if sell_amount_base * current_price > 1.0:  # minimum ~1 MXN
+                        signals.append(Signal(
+                            book=book,
+                            side="sell",
+                            amount=sell_amount_base,
+                            reason=f"BULL regime — taking {self.sell_pct*100:.0f}% profits ({days_since_buy:.0f}d hold)",
+                        ))
 
         elif regime == MarketRegime.BEAR:
             # Accumulate conservatively — buy with a small fraction of available pool
