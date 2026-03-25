@@ -132,6 +132,9 @@ class RegimeBacktestEngine:
                 candle = book_date_map[book].get(day_ts)
                 if candle is not None:
                     book_candle_lists[book].append(candle)
+                    # Keep only trailing 300 candles for regime detection (need max 200)
+                    if len(book_candle_lists[book]) > 300:
+                        book_candle_lists[book] = book_candle_lists[book][-300:]
                     day_prices[book] = float(
                         candle["close"] if hasattr(candle, "__getitem__") else candle.close
                     )
@@ -145,11 +148,11 @@ class RegimeBacktestEngine:
                 if len(candle_window) < 200:
                     continue
 
-                new_regime = self.detector.detect(candle_window)
+                old_regime = current_regimes[book]
+                new_regime = self.detector.detect(candle_window, old_regime)
                 if new_regime is None:
                     continue
 
-                old_regime = current_regimes[book]
                 if new_regime != old_regime:
                     current_regimes[book] = new_regime
                     regime_changes += 1
