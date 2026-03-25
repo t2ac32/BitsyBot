@@ -11,6 +11,8 @@ import math
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from tqdm import tqdm
+
 from strategy.grid import GridStrategy, GridLevel, LevelStatus
 from data.db import insert_trade, insert_grid, record_balance
 
@@ -101,7 +103,7 @@ class BacktestEngine:
         trade_pnls: list[float] = []
         portfolio_values: list[float] = []
 
-        for candle in self.candles:
+        for candle in tqdm(self.candles, desc="Backtesting", unit="candle", ncols=80):
             ts = candle["ts"] if hasattr(candle, "__getitem__") else candle.timestamp
             low = float(candle["low"] if hasattr(candle, "__getitem__") else candle.low)
             high = float(candle["high"] if hasattr(candle, "__getitem__") else candle.high)

@@ -69,6 +69,7 @@ SQLite with tables: `grids`, `grid_levels`, `trades`, `balance_history`, `candle
 - For new features or fixes, create a feature branch off `develop`, do the work, then open a PR into `develop`.
 - Only merge `develop` into `main` when the user explicitly approves a production release.
 - When spawning new agents (Task tool), always ensure they work on the `develop` branch or a feature branch off `develop` — never on `main`.
+- Do NOT add "Co-Authored-By" lines to commit messages.
 
 ## Key Design Decisions
 
