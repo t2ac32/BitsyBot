@@ -46,6 +46,26 @@ def fetch_and_store(
     return total_inserted
 
 
+def fetch_multiple_books(
+    client: BitsoClient,
+    books: list[str],
+    time_bucket: str = "1d",
+    days_back: int = 365,
+) -> dict[str, int]:
+    """
+    Fetch candles for multiple books with rate limiting between each.
+    Returns dict of {book: new_candles_count}.
+    """
+    results = {}
+    for i, book in enumerate(books):
+        print(f"\n[{i+1}/{len(books)}] Fetching {book}...")
+        total = fetch_and_store(client, book=book, time_bucket=time_bucket, days_back=days_back)
+        results[book] = total
+        if i < len(books) - 1:
+            time.sleep(0.5)  # extra pause between books
+    return results
+
+
 def load_candles(
     book: str,
     time_bucket: str,

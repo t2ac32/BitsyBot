@@ -34,8 +34,27 @@ PAPER_INITIAL_BALANCE: float = float(os.getenv("BITSYBOT_PAPER_BALANCE", "10000"
 POLL_INTERVAL_SECONDS: int = int(os.getenv("BITSYBOT_POLL_INTERVAL", "10"))
 
 # ── Backtest ──────────────────────────────────────────────────────────────────
-BACKTEST_DAYS: int = int(os.getenv("BITSYBOT_BACKTEST_DAYS", "365"))
+BACKTEST_DAYS: int = int(os.getenv("BITSYBOT_BACKTEST_DAYS", "1825"))
 BACKTEST_TIME_BUCKET: str = os.getenv("BITSYBOT_TIME_BUCKET", "1d")
+
+# ── Strategy selector ────────────────────────────────────────────────────────
+# "grid"   → original grid trading strategy (single book)
+# "regime" → multi-coin regime detection strategy
+STRATEGY: str = os.getenv("BITSYBOT_STRATEGY", "grid")
+
+# ── Regime strategy ──────────────────────────────────────────────────────────
+REGIME_BOOKS: list[str] = os.getenv(
+    "BITSYBOT_REGIME_BOOKS",
+    "btc_mxn,eth_mxn,xrp_mxn",
+).split(",")
+REGIME_INVESTMENT_MXN: float = float(os.getenv("BITSYBOT_REGIME_INVESTMENT_MXN", "10000"))
+REGIME_POLL_INTERVAL: int = int(os.getenv("BITSYBOT_REGIME_POLL_INTERVAL", "3600"))
+REGIME_ATR_THRESHOLD: float = float(os.getenv("BITSYBOT_REGIME_ATR_THRESHOLD", "2.0"))  # Lowered from 3.0
+REGIME_DCA_INTERVAL_DAYS: int = int(os.getenv("BITSYBOT_REGIME_DCA_INTERVAL_DAYS", "90"))
+REGIME_SELL_PCT: float = float(os.getenv("BITSYBOT_REGIME_SELL_PCT", "0.20"))           # 20% profit-taking
+REGIME_BUY_PCT_BEAR: float = float(os.getenv("BITSYBOT_REGIME_BUY_PCT_BEAR", "0.05"))   # 5% buys in bear
+REGIME_BUY_PCT_ACCUM: float = float(os.getenv("BITSYBOT_REGIME_BUY_PCT_ACCUM", "0.05")) # 5% buys in accumulation
+REGIME_DOWNTREND_PROTECTION_PCT: float = float(os.getenv("BITSYBOT_REGIME_DOWNTREND_PROTECTION_PCT", "20.0"))
 
 # ── Dashboard ─────────────────────────────────────────────────────────────────
 DASHBOARD_PORT: int = int(os.getenv("BITSYBOT_DASHBOARD_PORT", "8501"))

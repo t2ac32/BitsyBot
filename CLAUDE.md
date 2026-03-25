@@ -66,9 +66,9 @@ SQLite with tables: `grids`, `grid_levels`, `trades`, `balance_history`, `candle
 
 - **`main`** is production. Never commit directly to main.
 - **`develop`** is the integration branch. All new work merges here first.
-- For new features or fixes, create a feature branch off `develop`, do the work, then open a PR into `develop`.
+- For new features or fixes, **always create a git worktree** before starting work. Use `git worktree add ../BitsyBot-<branch-name> -b <branch-name> develop` so work happens in an isolated directory without disrupting the main checkout.
 - Only merge `develop` into `main` when the user explicitly approves a production release.
-- When spawning new agents (Task tool), always ensure they work on the `develop` branch or a feature branch off `develop` — never on `main`.
+- When spawning new agents (Task tool), always ensure they work on the `develop` branch or a feature branch off `develop` — never on `main`. Each agent should use its own worktree.
 - Do NOT add "Co-Authored-By" lines to commit messages.
 
 ## Key Design Decisions
