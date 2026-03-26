@@ -92,11 +92,25 @@ def init_db() -> None:
                 UNIQUE(book, time_bucket, ts)
             );
 
+            CREATE TABLE IF NOT EXISTS regime_history (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                book        TEXT    NOT NULL,
+                regime      TEXT    NOT NULL,
+                detected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
             CREATE INDEX IF NOT EXISTS idx_trades_mode ON trades(mode);
             CREATE INDEX IF NOT EXISTS idx_trades_grid ON trades(grid_id);
             CREATE INDEX IF NOT EXISTS idx_balance_mode ON balance_history(mode);
             CREATE INDEX IF NOT EXISTS idx_candles_book_bucket ON candles(book, time_bucket, ts);
+            CREATE INDEX IF NOT EXISTS idx_regime_history_book ON regime_history(book, detected_at);
         """)
+
+        # Add book column to balance_history if missing (backward compat)
+        try:
+            conn.execute("SELECT book FROM balance_history LIMIT 1")
+        except sqlite3.OperationalError:
+            conn.execute("ALTER TABLE balance_history ADD COLUMN book TEXT")
 
 
 # ── Grid helpers ──────────────────────────────────────────────────────────────
@@ -176,11 +190,12 @@ def get_trades(mode: str = None, grid_id: int = None, limit: int = 500) -> list[
 
 # ── Balance history helpers ───────────────────────────────────────────────────
 
-def record_balance(mode: str, balance_mxn: float, balance_btc: float = 0) -> None:
+def record_balance(mode: str, balance_mxn: float, balance_btc: float = 0,
+                   book: str = None) -> None:
     with db() as conn:
         conn.execute(
-            "INSERT INTO balance_history (mode, balance_mxn, balance_btc) VALUES (?, ?, ?)",
-            (mode, balance_mxn, balance_btc),
+            "INSERT INTO balance_history (mode, balance_mxn, balance_btc, book) VALUES (?, ?, ?, ?)",
+            (mode, balance_mxn, balance_btc, book),
         )
 
 
@@ -207,6 +222,42 @@ def upsert_candles(book: str, time_bucket: str, candles: list) -> int:
             inserted += cur.rowcount
     return inserted
 
+
+# ── Regime history helpers ────────────────────────────────────────────────
+
+def insert_regime_change(book: str, regime: str) -> int:
+    with db() as conn:
+        cur = conn.execute(
+            "INSERT INTO regime_history (book, regime) VALUES (?, ?)",
+            (book, regime),
+        )
+        return cur.lastrowid
+
+
+def get_regime_history(book: str = None, limit: int = 1000) -> list[sqlite3.Row]:
+    if book:
+        with db() as conn:
+            return conn.execute(
+                "SELECT * FROM regime_history WHERE book=? ORDER BY detected_at DESC LIMIT ?",
+                (book, limit),
+            ).fetchall()
+    else:
+        with db() as conn:
+            return conn.execute(
+                "SELECT * FROM regime_history ORDER BY detected_at DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+
+
+def get_last_regime(book: str) -> sqlite3.Row | None:
+    with db() as conn:
+        return conn.execute(
+            "SELECT * FROM regime_history WHERE book=? ORDER BY detected_at DESC LIMIT 1",
+            (book,),
+        ).fetchone()
+
+
+# ── Candle helpers ────────────────────────────────────────────────────────
 
 def get_candles(book: str, time_bucket: str,
                 start: datetime = None, end: datetime = None) -> list[sqlite3.Row]:

@@ -86,7 +86,7 @@ class BitsoClient:
             bid=float(payload["bid"]),
             ask=float(payload["ask"]),
             volume=float(payload["volume"]),
-            timestamp=datetime.utcfromtimestamp(int(payload["created_at"]) / 1000)
+            timestamp=datetime.fromisoformat(payload["created_at"].replace("Z", "+00:00"))
             if payload.get("created_at")
             else datetime.utcnow(),
         )

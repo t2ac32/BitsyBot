@@ -7,7 +7,16 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:api.bitso.com)",
       "WebFetch(domain:bitso.com)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(gh pr create:*)",
+      "Bash(git stash:*)",
+      "Bash(git checkout:*)",
+      "Bash(git pull:*)",
+      "Bash(git worktree remove:*)",
+      "Bash(git branch:*)",
+      "Bash(python main.py:*)"
     ]
   }
 }
