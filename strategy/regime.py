@@ -26,7 +26,7 @@ class Signal:
 class RegimeDetector:
     """
     Determines the current market regime for a single book using:
-    - SMA-20 and SMA-50 for trend direction
+    - SMA-100 and SMA-200 for long-term trend direction (slow, stable signals)
     - RSI-14 for momentum
     - MACD for trend confirmation
     - ATR-14 for volatility measurement
@@ -37,24 +37,27 @@ class RegimeDetector:
         ATR as a percentage of price above which the market is considered
         high-volatility (accumulation zone). Default 5.0 means 5.0%.
     sma_convergence_pct : float
-        When SMA-20 and SMA-50 are within this % of each other,
+        When SMA-100 and SMA-200 are within this % of each other,
         they're considered "flat" (accumulation). Default 1.0%.
     sma_short : int
-        Short SMA period. Default 20.
+        Short SMA period. Default 100.
     sma_long : int
-        Long SMA period. Default 50.
+        Long SMA period. Default 200.
+    sma_trend_lookback : int
+        Days to look back when checking if SMA is rising/falling. Default 20.
     rsi_bull_threshold : float
-        RSI above this is bullish. Default 55.
+        RSI above this is bullish. Default 60.
     rsi_bear_threshold : float
-        RSI below this is bearish. Default 45.
+        RSI below this is bearish. Default 40.
     """
 
     def __init__(
         self,
         atr_threshold_pct: float = 5.0,
         sma_convergence_pct: float = 1.0,
-        sma_short: int = 20,
-        sma_long: int = 50,
+        sma_short: int = 100,
+        sma_long: int = 200,
+        sma_trend_lookback: int = 20,
         rsi_bull_threshold: float = 60.0,
         rsi_bear_threshold: float = 40.0,
     ):
@@ -62,6 +65,7 @@ class RegimeDetector:
         self.sma_convergence_pct = sma_convergence_pct
         self.sma_short = sma_short
         self.sma_long = sma_long
+        self.sma_trend_lookback = sma_trend_lookback
         self.rsi_bull_threshold = rsi_bull_threshold
         self.rsi_bear_threshold = rsi_bear_threshold
 
@@ -71,7 +75,7 @@ class RegimeDetector:
 
         candles: list of objects/rows with .close, .high, .low attributes (or dict-like).
         last_regime: previous regime to apply hysteresis (prevents flip-flopping).
-        Needs at least sma_long candles (default 50).
+        Needs at least sma_long candles (default 200).
         Returns None if insufficient data.
 
         Priority: BULL > BEAR > ACCUMULATION (relaxed detection)
@@ -99,9 +103,10 @@ class RegimeDetector:
         current_rsi = rsi_values[-1]
         current_atr = atr_values[-1] if atr_values else 0
 
-        # SMA trend direction (is short SMA rising?)
-        sma_trending_up = len(sma_short_vals) > 5 and sma_short_vals[-1] > sma_short_vals[-5]
-        sma_trending_down = len(sma_short_vals) > 5 and sma_short_vals[-1] < sma_short_vals[-5]
+        # SMA trend direction (is short SMA rising over lookback period?)
+        lookback = self.sma_trend_lookback
+        sma_trending_up = len(sma_short_vals) > lookback and sma_short_vals[-1] > sma_short_vals[-lookback]
+        sma_trending_down = len(sma_short_vals) > lookback and sma_short_vals[-1] < sma_short_vals[-lookback]
 
         # MACD momentum
         macd_bullish = False

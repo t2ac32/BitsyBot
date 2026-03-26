@@ -124,6 +124,8 @@ class RegimeBacktestEngine:
         # We need at least 200 candles per book for regime detection.
         # Build a sliding window: for each date, collect all candles up to that date per book.
         book_candle_lists: dict[str, list] = {b: [] for b in active_books}
+        # Track first candle price per book for buy-and-hold benchmark (before window trimming)
+        book_first_prices: dict[str, float] = {}
 
         for day_ts in tqdm(sorted_dates, desc="Regime backtest", unit="day", ncols=80):
             # Accumulate candles per book
@@ -131,13 +133,14 @@ class RegimeBacktestEngine:
             for book in active_books:
                 candle = book_date_map[book].get(day_ts)
                 if candle is not None:
+                    close = float(candle["close"] if hasattr(candle, "__getitem__") else candle.close)
+                    if book not in book_first_prices:
+                        book_first_prices[book] = close
                     book_candle_lists[book].append(candle)
-                    # Keep only trailing 300 candles for regime detection (need max 200)
-                    if len(book_candle_lists[book]) > 300:
-                        book_candle_lists[book] = book_candle_lists[book][-300:]
-                    day_prices[book] = float(
-                        candle["close"] if hasattr(candle, "__getitem__") else candle.close
-                    )
+                    # Keep only trailing 250 candles for regime detection (need max 200 for SMA-200)
+                    if len(book_candle_lists[book]) > 250:
+                        book_candle_lists[book] = book_candle_lists[book][-250:]
+                    day_prices[book] = close
 
             # Detect regimes and evaluate signals per book
             for book in active_books:
@@ -242,12 +245,11 @@ class RegimeBacktestEngine:
             buy_hold_value = 0.0
             for book in active_books:
                 book_list = book_candle_lists[book]
-                if len(book_list) >= 2:
-                    first_price = float(book_list[0]["close"] if hasattr(book_list[0], "__getitem__") else book_list[0].close)
+                first_price = book_first_prices.get(book, 0.0)
+                if book_list and first_price > 0:
                     last_price = float(book_list[-1]["close"] if hasattr(book_list[-1], "__getitem__") else book_list[-1].close)
-                    if first_price > 0:
-                        amount = per_book_investment / first_price
-                        buy_hold_value += amount * last_price
+                    amount = per_book_investment / first_price
+                    buy_hold_value += amount * last_price
 
         buy_hold_roi = ((buy_hold_value - initial_mxn) / initial_mxn) * 100 if initial_mxn else 0
         alpha = roi_pct - buy_hold_roi
