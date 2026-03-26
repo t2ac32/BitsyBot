@@ -65,7 +65,6 @@ class RegimeBacktestEngine:
         start_date: datetime = None,
         end_date: datetime = None,
         cooldown_days: int = 30,
-        persistence_days: int = 5,
     ):
         self.books = books
         self.detector = detector
@@ -74,7 +73,6 @@ class RegimeBacktestEngine:
         self.start_date = start_date
         self.end_date = end_date
         self.cooldown_days = cooldown_days
-        self.persistence_days = persistence_days
 
     def run(self, persist: bool = False) -> RegimeBacktestResult:
         # Load candles for all books
@@ -119,10 +117,6 @@ class RegimeBacktestEngine:
         # Cooldown tracking: prevent regime changes more than once per cooldown window
         last_regime_change_ts: dict[str, datetime | None] = {b: None for b in active_books}
 
-        # Persistence tracking: require N consecutive days of same signal before committing
-        pending_regime: dict[str, MarketRegime | None] = {b: None for b in active_books}
-        pending_count: dict[str, int] = {b: 0 for b in active_books}
-
         # Tracking
         equity_curve: list[tuple[datetime, float]] = []
         portfolio_values: list[float] = []
@@ -163,21 +157,9 @@ class RegimeBacktestEngine:
                     continue
 
                 old_regime = current_regimes[book]
-                raw_regime = self.detector.detect(candle_window, old_regime)
-                if raw_regime is None:
+                new_regime = self.detector.detect(candle_window, old_regime)
+                if new_regime is None:
                     continue
-
-                # Persistence: require N consecutive days of same signal before committing
-                if raw_regime == pending_regime[book]:
-                    pending_count[book] += 1
-                else:
-                    pending_regime[book] = raw_regime
-                    pending_count[book] = 1
-
-                if pending_count[book] >= self.persistence_days:
-                    new_regime = raw_regime
-                else:
-                    new_regime = old_regime if old_regime is not None else raw_regime
 
                 if new_regime != old_regime:
                     # Enforce cooldown: skip regime change if within cooldown window

@@ -56,7 +56,6 @@ REGIME_BUY_PCT_BEAR: float = float(os.getenv("BITSYBOT_REGIME_BUY_PCT_BEAR", "0.
 REGIME_BUY_PCT_ACCUM: float = float(os.getenv("BITSYBOT_REGIME_BUY_PCT_ACCUM", "0.05")) # 5% buys in accumulation
 REGIME_DOWNTREND_PROTECTION_PCT: float = float(os.getenv("BITSYBOT_REGIME_DOWNTREND_PROTECTION_PCT", "20.0"))
 REGIME_COOLDOWN_DAYS: int = int(os.getenv("REGIME_COOLDOWN_DAYS", "30"))
-REGIME_PERSISTENCE_DAYS: int = int(os.getenv("REGIME_PERSISTENCE_DAYS", "5"))
 
 # ── Dashboard ─────────────────────────────────────────────────────────────────
 DASHBOARD_PORT: int = int(os.getenv("BITSYBOT_DASHBOARD_PORT", "8501"))

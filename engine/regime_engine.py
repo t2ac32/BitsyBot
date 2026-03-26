@@ -48,7 +48,6 @@ class RegimeEngine:
         initial_balance_mxn: float = 10_000.0,
         poll_interval: int = 3600,
         cooldown_days: int = 30,
-        persistence_days: int = 5,
     ):
         self.client = client
         self.books = books
@@ -58,7 +57,6 @@ class RegimeEngine:
         self.balance_mxn = initial_balance_mxn
         self.poll_interval = poll_interval
         self.cooldown_days = cooldown_days
-        self.persistence_days = persistence_days
         self._running = False
 
         # Per-book state
@@ -68,10 +66,6 @@ class RegimeEngine:
         self.last_regime_change_ts: dict[str, datetime | None] = {book: None for book in books}
         self.total_spent: dict[str, float] = {book: 0.0 for book in books}
         self.average_cost: dict[str, float] = {book: 0.0 for book in books}
-
-        # Persistence tracking: require N consecutive ticks of same signal before committing
-        self.pending_regime: dict[str, MarketRegime | None] = {book: None for book in books}
-        self.pending_count: dict[str, int] = {book: 0 for book in books}
 
     def start(self) -> None:
         print(f"[Regime/{self.mode}] Starting regime engine")
@@ -134,23 +128,11 @@ class RegimeEngine:
                 continue
 
             old_regime = self.regimes[book]
-            raw_regime = self.detector.detect(candles, old_regime)
-            if not raw_regime:
+            committed_regime = self.detector.detect(candles, old_regime)
+            if not committed_regime:
                 continue
 
-            # Persistence: require N consecutive ticks of same signal before committing
-            if raw_regime == self.pending_regime[book]:
-                self.pending_count[book] += 1
-            else:
-                self.pending_regime[book] = raw_regime
-                self.pending_count[book] = 1
-
-            if self.pending_count[book] >= self.persistence_days:
-                committed_regime = raw_regime
-            else:
-                committed_regime = old_regime if old_regime is not None else raw_regime
-
-            if committed_regime and committed_regime != old_regime:
+            if committed_regime != old_regime:
                 now = datetime.utcnow()
                 # Enforce cooldown: skip regime change if within cooldown window
                 if (

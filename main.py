@@ -148,7 +148,6 @@ def cmd_regime(client: BitsoClient, mode: str, start_date: str = None, end_date:
             start_date=start_dt,
             end_date=end_dt,
             cooldown_days=config.REGIME_COOLDOWN_DAYS,
-            persistence_days=config.REGIME_PERSISTENCE_DAYS,
         )
         results = engine.run(persist=True)
         RegimeBacktestEngine.print_report(results)
@@ -173,7 +172,6 @@ def cmd_regime(client: BitsoClient, mode: str, start_date: str = None, end_date:
         initial_balance_mxn=config.REGIME_INVESTMENT_MXN,
         poll_interval=config.REGIME_POLL_INTERVAL,
         cooldown_days=config.REGIME_COOLDOWN_DAYS,
-        persistence_days=config.REGIME_PERSISTENCE_DAYS,
     )
     engine.start()
 
