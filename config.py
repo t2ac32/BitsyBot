@@ -57,6 +57,10 @@ REGIME_BUY_PCT_ACCUM: float = float(os.getenv("BITSYBOT_REGIME_BUY_PCT_ACCUM", "
 REGIME_DOWNTREND_PROTECTION_PCT: float = float(os.getenv("BITSYBOT_REGIME_DOWNTREND_PROTECTION_PCT", "20.0"))
 REGIME_COOLDOWN_DAYS: int = int(os.getenv("REGIME_COOLDOWN_DAYS", "30"))
 
+# ── Notifications ─────────────────────────────────────────────────────────────
+TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID: str = os.getenv("TELEGRAM_CHAT_ID", "")
+
 # ── Dashboard ─────────────────────────────────────────────────────────────────
 DASHBOARD_PORT: int = int(os.getenv("BITSYBOT_DASHBOARD_PORT", "8501"))
 DASHBOARD_REFRESH_SECONDS: int = int(os.getenv("BITSYBOT_DASHBOARD_REFRESH", "30"))

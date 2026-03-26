@@ -12,12 +12,14 @@ import signal
 import sys
 from datetime import datetime
 
+import config as cfg
 from exchange.client import BitsoClient
 from strategy.grid import GridStrategy, GridLevel, LevelStatus
 from data.db import (
     insert_grid, insert_grid_level, update_level_status,
     insert_trade, record_balance, get_active_levels,
 )
+from notifier import get_notifier
 
 
 class PaperEngine:
@@ -53,6 +55,7 @@ class PaperEngine:
         self.levels: list[GridLevel] = []
         self._running = False
         self._last_price: float = None
+        self.notifier = get_notifier(cfg)
 
     # ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -154,6 +157,12 @@ class PaperEngine:
             "paper",
         )
         update_level_status(self.grid_id, fill["index"], "filled")
+
+        if self.notifier:
+            self.notifier.send_trade(
+                fill["side"], self.strategy.book, fill["price"],
+                fill["amount"], pnl, fee, "paper",
+            )
 
         print(
             f"[Paper] {action} level #{fill['index']:02d} @ {fill['price']:>12,.2f} MXN "

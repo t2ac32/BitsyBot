@@ -7,12 +7,14 @@ import time
 import signal
 import sys
 
+import config as cfg
 from exchange.client import BitsoClient
 from strategy.grid import GridStrategy, GridLevel, LevelStatus
 from data.db import (
     insert_grid, insert_grid_level, update_level_status,
     insert_trade, record_balance,
 )
+from notifier import get_notifier
 
 
 class LiveEngine:
@@ -33,6 +35,7 @@ class LiveEngine:
         self.grid_id: int = None
         self.levels: list[GridLevel] = []
         self._running = False
+        self.notifier = get_notifier(cfg)
 
     def start(self) -> None:
         print(f"[Live] Starting LIVE trading — {self.strategy.book}")
@@ -125,6 +128,12 @@ class LiveEngine:
                         level.price, self.strategy.amount_per_level,
                         0, 0, "live",
                     )
+
+                    if self.notifier:
+                        self.notifier.send_trade(
+                            level.side, self.strategy.book, level.price,
+                            self.strategy.amount_per_level, 0, 0, "live",
+                        )
 
                     counter = self.strategy._create_counter_level(self.levels, level)
                     if counter:
