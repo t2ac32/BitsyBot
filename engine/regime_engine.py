@@ -47,6 +47,8 @@ class RegimeEngine:
         mode: str = "paper",
         initial_balance_mxn: float = 10_000.0,
         poll_interval: int = 3600,
+        cooldown_days: int = 30,
+        persistence_days: int = 5,
     ):
         self.client = client
         self.books = books
@@ -55,14 +57,21 @@ class RegimeEngine:
         self.mode = mode
         self.balance_mxn = initial_balance_mxn
         self.poll_interval = poll_interval
+        self.cooldown_days = cooldown_days
+        self.persistence_days = persistence_days
         self._running = False
 
         # Per-book state
         self.holdings: dict[str, float] = {book: 0.0 for book in books}
         self.regimes: dict[str, MarketRegime | None] = {book: None for book in books}
         self.last_buy_time: dict[str, datetime | None] = {book: None for book in books}
+        self.last_regime_change_ts: dict[str, datetime | None] = {book: None for book in books}
         self.total_spent: dict[str, float] = {book: 0.0 for book in books}
         self.average_cost: dict[str, float] = {book: 0.0 for book in books}
+
+        # Persistence tracking: require N consecutive ticks of same signal before committing
+        self.pending_regime: dict[str, MarketRegime | None] = {book: None for book in books}
+        self.pending_count: dict[str, int] = {book: 0 for book in books}
 
     def start(self) -> None:
         print(f"[Regime/{self.mode}] Starting regime engine")
@@ -125,15 +134,40 @@ class RegimeEngine:
                 continue
 
             old_regime = self.regimes[book]
-            new_regime = self.detector.detect(candles, old_regime)
+            raw_regime = self.detector.detect(candles, old_regime)
+            if not raw_regime:
+                continue
 
-            if new_regime and new_regime != old_regime:
-                self.regimes[book] = new_regime
-                insert_regime_change(book, new_regime.value)
-                if old_regime is not None:
-                    print(f"[Regime/{self.mode}] {book}: {old_regime.value} → {new_regime.value}")
+            # Persistence: require N consecutive ticks of same signal before committing
+            if raw_regime == self.pending_regime[book]:
+                self.pending_count[book] += 1
+            else:
+                self.pending_regime[book] = raw_regime
+                self.pending_count[book] = 1
+
+            if self.pending_count[book] >= self.persistence_days:
+                committed_regime = raw_regime
+            else:
+                committed_regime = old_regime if old_regime is not None else raw_regime
+
+            if committed_regime and committed_regime != old_regime:
+                now = datetime.utcnow()
+                # Enforce cooldown: skip regime change if within cooldown window
+                if (
+                    old_regime is not None
+                    and self.last_regime_change_ts[book] is not None
+                    and (now - self.last_regime_change_ts[book]).days < self.cooldown_days
+                ):
+                    # Too soon since last change — keep old regime
+                    pass
                 else:
-                    print(f"[Regime/{self.mode}] {book}: initial regime = {new_regime.value}")
+                    self.regimes[book] = committed_regime
+                    self.last_regime_change_ts[book] = now
+                    insert_regime_change(book, committed_regime.value)
+                    if old_regime is not None:
+                        print(f"[Regime/{self.mode}] {book}: {old_regime.value} → {committed_regime.value}")
+                    else:
+                        print(f"[Regime/{self.mode}] {book}: initial regime = {committed_regime.value}")
 
     def _execute_signal(self, sig: Signal, current_price: float) -> None:
         fee = current_price * sig.amount * self.FEE_RATE
