@@ -60,6 +60,9 @@ REGIME_COOLDOWN_DAYS: int = int(os.getenv("REGIME_COOLDOWN_DAYS", "30"))
 # ── Notifications ─────────────────────────────────────────────────────────────
 TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID: str = os.getenv("TELEGRAM_CHAT_ID", "")
+# Optional: direct GIF URLs shown in /status reply (leave blank to disable)
+TELEGRAM_GIF_PROFIT: str = os.getenv("TELEGRAM_GIF_PROFIT", "")
+TELEGRAM_GIF_LOSS: str = os.getenv("TELEGRAM_GIF_LOSS", "")
 
 # ── Dashboard ─────────────────────────────────────────────────────────────────
 DASHBOARD_PORT: int = int(os.getenv("BITSYBOT_DASHBOARD_PORT", "8501"))

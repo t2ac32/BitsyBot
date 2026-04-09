@@ -17,7 +17,7 @@ from exchange.client import BitsoClient
 from strategy.grid import GridStrategy, GridLevel, LevelStatus
 from data.db import (
     insert_grid, insert_grid_level, update_level_status,
-    insert_trade, record_balance, get_active_levels,
+    insert_trade, record_balance, get_active_levels, get_trade_stats,
 )
 from notifier import get_notifier
 
@@ -92,6 +92,12 @@ class PaperEngine:
 
         self._last_price = current_price
         self._running = True
+
+        if self.notifier:
+            self.notifier.start_command_listener(
+                lambda: get_trade_stats("paper"), "paper"
+            )
+
         self._loop()
 
     def _loop(self) -> None:
@@ -183,6 +189,8 @@ class PaperEngine:
     def _handle_shutdown(self, sig, frame) -> None:
         print("\n[Paper] Shutting down gracefully...")
         self._running = False
+        if self.notifier:
+            self.notifier.stop_command_listener()
         sys.exit(0)
 
     # ── Status accessors ───────────────────────────────────────────────────────

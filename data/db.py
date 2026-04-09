@@ -257,6 +257,39 @@ def get_last_regime(book: str) -> sqlite3.Row | None:
         ).fetchone()
 
 
+def get_trade_stats(mode: str = None) -> dict:
+    """Return aggregated trade stats for the given mode (or all modes if None)."""
+    mode_clause = "mode=?" if mode else "1=1"
+    params = [mode] if mode else []
+    with db() as conn:
+        agg = conn.execute(
+            f"SELECT COUNT(*) as total, "
+            f"SUM(CASE WHEN side='buy' THEN 1 ELSE 0 END) as buys, "
+            f"SUM(CASE WHEN side='sell' THEN 1 ELSE 0 END) as sells, "
+            f"COALESCE(SUM(pnl), 0) as total_pnl "
+            f"FROM trades WHERE {mode_clause}",
+            params,
+        ).fetchone()
+        last_buy = conn.execute(
+            f"SELECT price, amount, timestamp FROM trades "
+            f"WHERE {mode_clause} AND side='buy' ORDER BY timestamp DESC LIMIT 1",
+            params,
+        ).fetchone()
+        last_sell = conn.execute(
+            f"SELECT price, amount, timestamp FROM trades "
+            f"WHERE {mode_clause} AND side='sell' ORDER BY timestamp DESC LIMIT 1",
+            params,
+        ).fetchone()
+    return {
+        "total_trades": agg["total"] or 0,
+        "buys": agg["buys"] or 0,
+        "sells": agg["sells"] or 0,
+        "total_pnl": agg["total_pnl"] or 0.0,
+        "last_buy": {"price": last_buy["price"], "amount": last_buy["amount"], "timestamp": str(last_buy["timestamp"])} if last_buy else None,
+        "last_sell": {"price": last_sell["price"], "amount": last_sell["amount"], "timestamp": str(last_sell["timestamp"])} if last_sell else None,
+    }
+
+
 # ── Candle helpers ────────────────────────────────────────────────────────
 
 def get_candles(book: str, time_bucket: str,

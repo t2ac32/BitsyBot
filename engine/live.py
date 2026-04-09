@@ -12,7 +12,7 @@ from exchange.client import BitsoClient
 from strategy.grid import GridStrategy, GridLevel, LevelStatus
 from data.db import (
     insert_grid, insert_grid_level, update_level_status,
-    insert_trade, record_balance,
+    insert_trade, record_balance, get_trade_stats,
 )
 from notifier import get_notifier
 
@@ -74,6 +74,12 @@ class LiveEngine:
 
         print(f"[Live] Grid active (id={self.grid_id}). Press Ctrl+C to stop.")
         self._running = True
+
+        if self.notifier:
+            self.notifier.start_command_listener(
+                lambda: get_trade_stats("live"), "live"
+            )
+
         self._loop()
 
     def _place_all_orders(self) -> None:
@@ -164,6 +170,8 @@ class LiveEngine:
     def _handle_shutdown(self, sig, frame) -> None:
         print("\n[Live] Shutting down — cancelling all open orders...")
         self._running = False
+        if self.notifier:
+            self.notifier.stop_command_listener()
         try:
             self.client.cancel_all_orders(self.strategy.book)
             print("[Live] All orders cancelled.")
